@@ -1,22 +1,53 @@
 ﻿#pragma once
 
+#include <vector>
+
 #include <vk_types.h>
 
 class VulkanEngine {
-public:
+    public:
+        bool isInitialized{ false };
+        int frameNumber {0};
+        VkExtent2D windowExtent{ 1700 , 900 };
+        struct SDL_Window* window{ nullptr };
 
-	bool isInitialized{ false };
-	int frameNumber {0};
+        VkInstance instance;
+        VkDebugUtilsMessengerEXT debugMessenger;
+        VkPhysicalDevice physicalDevice;
+        VkDevice device;
+        VkSurfaceKHR surface;
 
-	VkExtent2D windowExtent{ 1700 , 900 };
+        VkSwapchainKHR swapchain;
+        VkFormat swapchainImageFormat;
+        std::vector<VkImage> swapchainImages;
+        std::vector<VkImageView> swapchainImageViews;
 
-	struct SDL_Window* window{ nullptr };
+        VkQueue graphicsQueue;
+        uint32_t graphicsQueueFamily;
 
-	void init();
+        VkCommandPool commandPool;
+        VkCommandBuffer commandBuffer;
 
-	void cleanup();
+        VkRenderPass renderPass;
+        std::vector<VkFramebuffer> framebuffers;
 
-	void draw();
+        VkSemaphore renderSemaphore;
+        VkSemaphore presentSemaphore;
+        VkFence renderFence;
+        
+        void init();
 
-	void run();
+        void cleanup();
+
+        void draw();
+
+        void run();
+
+    private:
+        void initVulkan();
+        void initSwapchain();
+        void initCommands();
+        void initDefaultRenderpass();
+        void initFramebuffers();
+        void initSyncStructures();
 };
