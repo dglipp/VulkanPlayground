@@ -2,6 +2,7 @@
 #include "vk_engine.h"
 
 #include <iostream>
+#include <fstream>
 
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_vulkan.h>
@@ -44,6 +45,7 @@ void VulkanEngine::init()
     initDefaultRenderpass();
     initFramebuffers();
     initSyncStructures();
+    initPipelines();
 
     isInitialized = true;
 }
@@ -112,6 +114,10 @@ void VulkanEngine::draw()
         .pClearValues = &clearValue};
 
     vkCmdBeginRenderPass(cmd, &rpInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
+    vkCmdDraw(cmd, 3, 1, 0, 0);
+
     vkCmdEndRenderPass(cmd);
     VK_CHECK(vkEndCommandBuffer(cmd));
 
@@ -289,4 +295,128 @@ void VulkanEngine::initSyncStructures()
 
     VK_CHECK(vkCreateSemaphore(device, &semaphoreCreateInfo, nullptr, &presentSemaphore));
     VK_CHECK(vkCreateSemaphore(device, &semaphoreCreateInfo, nullptr, &renderSemaphore));
+}
+
+bool VulkanEngine::loadShaderModule(std::string filepath, VkShaderModule *outShaderModule)
+{
+    std::ifstream file(filepath, std::ios::ate | std::ios::binary);
+    if(!file.is_open())
+    {
+        std::cout << "Can't open file: " << filepath << std::endl;
+        return false;
+    }
+
+    size_t fileSize = (size_t)file.tellg();
+
+    std::vector<uint32_t> buffer(fileSize / sizeof(uint32_t));
+
+    file.seekg(0);
+    file.read((char *)buffer.data(), fileSize);
+    file.close();
+
+    VkShaderModuleCreateInfo createInfo = {
+        .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+        .pNext = nullptr,
+        .codeSize = buffer.size() * sizeof(uint32_t),
+        .pCode = buffer.data()};
+
+    VkShaderModule shaderModule;
+    if(vkCreateShaderModule(device, &createInfo, nullptr, &shaderModule) != VK_SUCCESS)
+    {
+        return false;
+    }
+    *outShaderModule = shaderModule;
+    return true;
+}
+
+void VulkanEngine::initPipelines()
+{
+    VkShaderModule triangleFragShader;
+    if(!loadShaderModule("../shaders/triangle.frag.spv", &triangleFragShader))
+    {
+        std::cout << "Error building triangle fragment shader module" << std::endl;
+    }
+    else 
+    {
+        std::cout << "Triangle fragment shader successfully loaded" << std::endl;
+    }
+
+    VkShaderModule triangleVertShader;
+    if(!loadShaderModule("../shaders/triangle.vert.spv", &triangleVertShader))
+    {
+        std::cout << "Error building triangle vertex shader module" << std::endl;
+    }
+    else
+    {
+        std::cout << "Triangle vertex shader successfully loaded" << std::endl;
+    }
+
+    VkPipelineLayoutCreateInfo pipelineLayoutInfo = vkInit::pipelineLayoutCreateInfo();
+    VK_CHECK(vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &graphicsPipelineLayout));
+
+    PipelineBuilder pipelineBuilder;
+    pipelineBuilder.shaderStages.push_back(vkInit::pipelineShaderStageCreateInfo(VK_SHADER_STAGE_VERTEX_BIT, triangleVertShader));
+    pipelineBuilder.shaderStages.push_back(vkInit::pipelineShaderStageCreateInfo(VK_SHADER_STAGE_FRAGMENT_BIT, triangleFragShader));
+    pipelineBuilder.vertexInputInfo = vkInit::vertexInputStateCreateInfo();
+    pipelineBuilder.inputAssembly = vkInit::inputAssemblyCreateInfo(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
+    pipelineBuilder.viewport = {
+        .x = 0.0f,
+        .y = 0.0f,
+        .width = (float)windowExtent.width,
+        .height = (float)windowExtent.height,
+        .minDepth = 0.0f,
+        .maxDepth = 1.0f};
+
+    pipelineBuilder.scissor = {
+        .offset = {0, 0},
+        .extent = windowExtent};
+
+    pipelineBuilder.rasterizer = vkInit::rasterizationStateCreateInfo(VK_POLYGON_MODE_FILL);
+    pipelineBuilder.multisampling = vkInit::multisampleStateCreateInfo();
+    pipelineBuilder.colorBlendAttachment = vkInit::colorBlendAttachmentState();
+    pipelineBuilder.pipelineLayout = graphicsPipelineLayout;
+    graphicsPipeline = pipelineBuilder.buildPipeline(device, renderPass);
+}
+
+VkPipeline PipelineBuilder::buildPipeline(VkDevice device, VkRenderPass pass)
+{
+    VkPipelineViewportStateCreateInfo viewportState = {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
+        .pNext = nullptr,
+        .viewportCount = 1,
+        .pViewports = &viewport,
+        .scissorCount = 1,
+        .pScissors = &scissor};
+
+    VkPipelineColorBlendStateCreateInfo colorBlending = {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
+        .pNext = nullptr,
+        .logicOpEnable = VK_FALSE,
+        .logicOp = VK_LOGIC_OP_COPY,
+        .attachmentCount = 1,
+        .pAttachments = &colorBlendAttachment};
+
+    VkGraphicsPipelineCreateInfo pipelineInfo = {
+        .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
+        .pNext = nullptr,
+        .stageCount = (uint32_t)shaderStages.size(),
+        .pStages = shaderStages.data(),
+        .pVertexInputState = &vertexInputInfo,
+        .pInputAssemblyState = &inputAssembly,
+        .pViewportState = &viewportState,
+        .pRasterizationState = &rasterizer,
+        .pMultisampleState = &multisampling,
+        .pColorBlendState = &colorBlending,
+        .layout = pipelineLayout,
+        .renderPass = pass,
+        .subpass = 0,
+        .basePipelineHandle = VK_NULL_HANDLE};
+
+    VkPipeline newPipeline;
+    if(vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &newPipeline) != VK_SUCCESS)
+    {
+        std::cout << "Failed to create graphics pipeline" << std::endl;
+        return VK_NULL_HANDLE;
+    }
+    return newPipeline;
 }

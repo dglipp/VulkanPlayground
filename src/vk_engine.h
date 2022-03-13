@@ -1,6 +1,7 @@
 ﻿#pragma once
 
 #include <vector>
+#include <string>
 
 #include <vk_types.h>
 
@@ -34,7 +35,10 @@ class VulkanEngine {
         VkSemaphore renderSemaphore;
         VkSemaphore presentSemaphore;
         VkFence renderFence;
-        
+
+        VkPipeline graphicsPipeline;
+        VkPipelineLayout graphicsPipelineLayout;
+
         void init();
 
         void cleanup();
@@ -50,4 +54,24 @@ class VulkanEngine {
         void initDefaultRenderpass();
         void initFramebuffers();
         void initSyncStructures();
+        bool loadShaderModule(std::string filepath, VkShaderModule *outShaderModule);
+        void initPipelines();
+};
+
+class PipelineBuilder
+{
+    public:
+        std::vector<VkPipelineShaderStageCreateInfo> shaderStages;
+        VkPipelineVertexInputStateCreateInfo vertexInputInfo;
+        VkPipelineInputAssemblyStateCreateInfo inputAssembly;
+        VkPipelineRasterizationStateCreateInfo rasterizer;
+        VkPipelineLayout pipelineLayout;
+        
+        VkPipelineColorBlendAttachmentState colorBlendAttachment;
+        VkPipelineMultisampleStateCreateInfo multisampling;
+
+        VkViewport viewport;
+        VkRect2D scissor;
+
+        VkPipeline buildPipeline(VkDevice device, VkRenderPass pass);
 };
