@@ -97,4 +97,20 @@ namespace vkInit
             .pushConstantRangeCount = 0,
             .pPushConstantRanges = nullptr};
     }
+
+    VkFenceCreateInfo fenceCreateInfo(VkFenceCreateFlags flags)
+    {
+        return {
+            .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
+            .pNext = nullptr,
+            .flags = flags};
+    }
+
+    VkSemaphoreCreateInfo semaphoreCreateInfo(VkSemaphoreCreateFlags flags)
+    {
+        return {
+            .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
+            .pNext = nullptr,
+            .flags = flags};
+    }
 }
