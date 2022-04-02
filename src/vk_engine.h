@@ -7,7 +7,8 @@
 
 class VulkanEngine {
     public:
-        bool isInitialized{ false };
+        int selectedShader{0};
+        bool isInitialized{false};
         int frameNumber {0};
         VkExtent2D windowExtent{ 1700 , 900 };
         struct SDL_Window* window{ nullptr };
@@ -36,7 +37,9 @@ class VulkanEngine {
         VkSemaphore presentSemaphore;
         VkFence renderFence;
 
-        VkPipeline graphicsPipeline;
+        VkPipeline trianglePipeline;
+        VkPipeline coloredTrianglePipeline;
+        
         VkPipelineLayout graphicsPipelineLayout;
 
         void init();

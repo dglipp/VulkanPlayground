@@ -83,7 +83,7 @@ void VulkanEngine::cleanup()
 }
 
 void VulkanEngine::draw()
-{
+{   
     VK_CHECK(vkWaitForFences(device, 1, &renderFence, true, 10E9));
     VK_CHECK(vkResetFences(device, 1, &renderFence));
 
@@ -115,10 +115,13 @@ void VulkanEngine::draw()
 
     vkCmdBeginRenderPass(cmd, &rpInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
+    if(selectedShader == 0) vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, trianglePipeline);
+    else vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, coloredTrianglePipeline);
+
     vkCmdDraw(cmd, 3, 1, 0, 0);
 
     vkCmdEndRenderPass(cmd);
+
     VK_CHECK(vkEndCommandBuffer(cmd));
 
     VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
@@ -160,6 +163,10 @@ void VulkanEngine::run()
 		while (SDL_PollEvent(&e) != 0)
 		{
 			if (e.type == SDL_QUIT) bQuit = true;
+            else if (e.type == SDL_KEYDOWN)
+            {
+                if(e.key.keysym.sym == SDLK_SPACE) selectedShader = 1 - selectedShader;
+            }
 		}
 		draw();
 	}
@@ -351,6 +358,26 @@ void VulkanEngine::initPipelines()
         std::cout << "Triangle vertex shader successfully loaded" << std::endl;
     }
 
+    VkShaderModule coloredTriangleFragShader;
+    if(!loadShaderModule("../shaders/coloredTriangle.frag.spv", &coloredTriangleFragShader))
+    {
+        std::cout << "Error building colored triangle fragment shader module" << std::endl;
+    }
+    else 
+    {
+        std::cout << "Colored Triangle fragment shader successfully loaded" << std::endl;
+    }
+
+    VkShaderModule coloredTriangleVertShader;
+    if(!loadShaderModule("../shaders/coloredTriangle.vert.spv", &coloredTriangleVertShader))
+    {
+        std::cout << "Error building colored triangle vertex shader module" << std::endl;
+    }
+    else
+    {
+        std::cout << "Colored Triangle vertex shader successfully loaded" << std::endl;
+    }
+
     VkPipelineLayoutCreateInfo pipelineLayoutInfo = vkInit::pipelineLayoutCreateInfo();
     VK_CHECK(vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &graphicsPipelineLayout));
 
@@ -375,7 +402,12 @@ void VulkanEngine::initPipelines()
     pipelineBuilder.multisampling = vkInit::multisampleStateCreateInfo();
     pipelineBuilder.colorBlendAttachment = vkInit::colorBlendAttachmentState();
     pipelineBuilder.pipelineLayout = graphicsPipelineLayout;
-    graphicsPipeline = pipelineBuilder.buildPipeline(device, renderPass);
+    trianglePipeline = pipelineBuilder.buildPipeline(device, renderPass);
+
+    pipelineBuilder.shaderStages.clear();
+    pipelineBuilder.shaderStages.push_back(vkInit::pipelineShaderStageCreateInfo(VK_SHADER_STAGE_VERTEX_BIT, coloredTriangleVertShader));
+    pipelineBuilder.shaderStages.push_back(vkInit::pipelineShaderStageCreateInfo(VK_SHADER_STAGE_FRAGMENT_BIT, coloredTriangleFragShader));
+    coloredTrianglePipeline = pipelineBuilder.buildPipeline(device, renderPass);
 }
 
 VkPipeline PipelineBuilder::buildPipeline(VkDevice device, VkRenderPass pass)
