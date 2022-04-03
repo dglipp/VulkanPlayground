@@ -1,6 +1,7 @@
 #pragma once
 
 #include <vector>
+#include <string>
 
 #include <glm/vec3.hpp>
 
@@ -25,4 +26,6 @@ struct Vertex {
 struct Mesh {
     std::vector<Vertex> vertices;
     AllocatedBuffer vertexBuffer;
+
+    bool loadObj(std::string filename);
 };

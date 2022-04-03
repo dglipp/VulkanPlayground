@@ -12,6 +12,8 @@
 #define VMA_IMPLEMENTATION
 #include "vk_mem_alloc.h"
 
+#include "glm/gtx/transform.hpp"
+
 #include <vk_types.h>
 #include <vk_initializers.h>
 
@@ -121,8 +123,20 @@ void VulkanEngine::draw()
         vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, meshPipeline);
 
         VkDeviceSize offset = 0;
-        vkCmdBindVertexBuffers(cmd, 0, 1, &triangleMesh.vertexBuffer.buffer, &offset);
-        vkCmdDraw(cmd, triangleMesh.vertices.size(), 1, 0, 0);
+        vkCmdBindVertexBuffers(cmd, 0, 1, &monkeyMesh.vertexBuffer.buffer, &offset);
+
+        glm::vec3 camPos = {0.0f, 0.0f, -2.0f};
+        glm::mat4 view = glm::translate(glm::mat4(1.0f), camPos);
+        glm::mat4 projection = glm::perspective(glm::radians(70.0f), 1700.f / 900.0f, 0.1f, 200.0f);
+        projection[1][1] *= -1;
+        glm::mat4 model = glm::rotate(glm::mat4(1.0f), glm::radians(frameNumber * 0.4f), glm::vec3(0, 1, 0));
+        glm::mat4 meshMatrix = projection * view * model;
+
+        MeshPushConstants constants = {
+            .renderMatrix = meshMatrix};
+
+        vkCmdPushConstants(cmd, meshPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(MeshPushConstants), &constants);
+        vkCmdDraw(cmd, monkeyMesh.vertices.size(), 1, 0, 0);
     }
 
     vkCmdEndRenderPass(cmd);
@@ -431,6 +445,16 @@ void VulkanEngine::initPipelines()
     VkPipelineLayoutCreateInfo pipelineLayoutInfo = vkInit::pipelineLayoutCreateInfo();
     VK_CHECK(vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &graphicsPipelineLayout));
 
+    VkPipelineLayoutCreateInfo meshPipelineLayoutInfo = vkInit::pipelineLayoutCreateInfo();
+    VkPushConstantRange pushConstant = {
+        .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
+        .offset = 0,
+        .size = sizeof(MeshPushConstants)};
+
+    meshPipelineLayoutInfo.pPushConstantRanges = &pushConstant;
+    meshPipelineLayoutInfo.pushConstantRangeCount = 1;
+    VK_CHECK(vkCreatePipelineLayout(device, &meshPipelineLayoutInfo, nullptr, &meshPipelineLayout));
+
     PipelineBuilder pipelineBuilder;
     pipelineBuilder.shaderStages.push_back(vkInit::pipelineShaderStageCreateInfo(VK_SHADER_STAGE_VERTEX_BIT, triangleVertShader));
     pipelineBuilder.shaderStages.push_back(vkInit::pipelineShaderStageCreateInfo(VK_SHADER_STAGE_FRAGMENT_BIT, triangleFragShader));
@@ -470,6 +494,7 @@ void VulkanEngine::initPipelines()
     pipelineBuilder.shaderStages.push_back(vkInit::pipelineShaderStageCreateInfo(VK_SHADER_STAGE_VERTEX_BIT, meshTriangleVertShader));
     pipelineBuilder.shaderStages.push_back(vkInit::pipelineShaderStageCreateInfo(VK_SHADER_STAGE_FRAGMENT_BIT, meshTriangleFragShader));
 
+    pipelineBuilder.pipelineLayout = meshPipelineLayout;
     meshPipeline = pipelineBuilder.buildPipeline(device, renderPass);
 
     vkDestroyShaderModule(device, coloredTriangleVertShader, nullptr);
@@ -483,6 +508,7 @@ void VulkanEngine::initPipelines()
                                    { vkDestroyPipeline(device, meshPipeline, nullptr);
                                      vkDestroyPipeline(device, coloredTrianglePipeline, nullptr);
                                      vkDestroyPipeline(device, trianglePipeline, nullptr);
+                                     vkDestroyPipelineLayout(device, meshPipelineLayout, nullptr);
                                      vkDestroyPipelineLayout(device, graphicsPipelineLayout, nullptr); });
 }
 
@@ -498,7 +524,10 @@ void VulkanEngine::loadMeshes()
     triangleMesh.vertices[1].color = {0.0f, 1.0f, 0.0f};
     triangleMesh.vertices[2].color = {0.0f, 1.0f, 0.0f};
 
+    monkeyMesh.loadObj("../assets/monkey_smooth.obj");
+
     uploadMesh(triangleMesh);
+    uploadMesh(monkeyMesh);
 }
 
 void VulkanEngine::uploadMesh(Mesh &mesh)

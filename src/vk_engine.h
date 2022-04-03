@@ -5,12 +5,19 @@
 #include <deque>
 #include <functional>
 
+#include "glm/glm.hpp"
 #include "vk_mem_alloc.h"
 
 #include "vk_types.h"
 #include "vk_mesh.h"
 
-struct DeletionQueue {
+struct MeshPushConstants {
+    glm::vec4 data;
+    glm::mat4 renderMatrix;
+};
+
+struct DeletionQueue
+{
     std::deque<std::function<void()>> deletors;
 
     void pushFunction(std::function<void()> && function)
@@ -64,8 +71,10 @@ class VulkanEngine {
         
         VkPipeline meshPipeline;
         Mesh triangleMesh;
+        Mesh monkeyMesh;
 
         VkPipelineLayout graphicsPipelineLayout;
+        VkPipelineLayout meshPipelineLayout;
 
         DeletionQueue mainDeletionQueue;
 
