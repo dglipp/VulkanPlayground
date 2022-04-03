@@ -5,7 +5,10 @@
 #include <deque>
 #include <functional>
 
-#include <vk_types.h>
+#include "vk_mem_alloc.h"
+
+#include "vk_types.h"
+#include "vk_mesh.h"
 
 struct DeletionQueue {
     std::deque<std::function<void()>> deletors;
@@ -58,10 +61,15 @@ class VulkanEngine {
 
         VkPipeline trianglePipeline;
         VkPipeline coloredTrianglePipeline;
+        
+        VkPipeline meshPipeline;
+        Mesh triangleMesh;
 
         VkPipelineLayout graphicsPipelineLayout;
 
         DeletionQueue mainDeletionQueue;
+
+        VmaAllocator allocator;
 
         void init();
 
@@ -80,6 +88,9 @@ class VulkanEngine {
         void initSyncStructures();
         bool loadShaderModule(std::string filepath, VkShaderModule *outShaderModule);
         void initPipelines();
+
+        void loadMeshes();
+        void uploadMesh(Mesh &mesh);
 };
 
 class PipelineBuilder
